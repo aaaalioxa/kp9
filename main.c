@@ -2,19 +2,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-
-typedef struct {
-    char key[3];
-    char value[100];
-    struct Item *next;
-    int index;
-} Item;
-
-typedef struct {
-    Item* head;
-    Item* tail;
-    int size;
-} Table;
+#include "table.h"
 
 int RInput(char *str, int op) {
     char *str1 = str;
@@ -63,12 +51,14 @@ Item* GetElement(Table* t, int n) {
             return temp;
         temp = (Item *) temp->next;
     }
+    return NULL;
 }
 
-void PushBack(Table* t, char* key, char* value) {
+void PushBack(Table* t, int num, char let, char* value) {
     Item* new = malloc(sizeof(Item));
-    strcpy(new->key, key);
     strcpy(new->value, value);
+    new->key.letter = let;
+    new->key.number = num;
     new->next = NULL;
     Item *tmp = (Item *) t->tail;
     t->tail = new;
@@ -84,44 +74,66 @@ void PrintTable(Table* t) {
     Item* temp = (Item *) t->head;
     printf("Key | Value\n");
     for (int i = 0; i < t->size; i++) {
-        printf("%s   %s\n", temp->key, temp->value);
+        printf("----|-----------------------------\n");
+        printf("%d %c | %s\n", temp->key.number, temp->key.letter, temp->value);
         temp = (Item *) temp->next;
     }
 }
 
-
-void ShellSort(Table* t) {
+void ShellSort(Table *t)
+{
     int n = t->size;
-    for (int interval = n / 2; interval > 0; interval /= 2) {
-        for (int i = interval; i < n; i += 1) {
-            char temp2[3];
-            char temp3[100];
-            strcpy(temp2, GetElement(t, i)->key);
-            strcpy(temp3, GetElement(t, i)->value);
-            int j;
-            for (j = i; j >= interval && strcmp(GetElement(t, j)->key, GetElement(t, j - interval)->key) < 0; j -= interval) {
-                strcpy(GetElement(t, j)->key, GetElement(t, j - interval)->key);
-                strcpy(GetElement(t, j)->value, GetElement(t, j - interval)->value);
+    int i, j, k;
+    char tmpVal[100];
+    int tmpNum;
+    char tmpLet;
+    for (i = n / 2; i > 0; i = i / 2)
+    {
+        for (j = i; j < n; j++)
+        {
+            for(k = j - i; k >= 0; k = k - i)
+            {
+                if ((GetElement(t, k + i)->key.number > GetElement(t, k)->key.number) || ((GetElement(t, k + i)->key.number == GetElement(t, k)->key.number) && ((GetElement(t, k + i)->key.letter > GetElement(t, k)->key.letter))))
+                    break;
+                else
+                {
+                    strcpy(tmpVal, GetElement(t, k)->value);
+                    tmpNum = GetElement(t, k)->key.number;
+                    tmpLet = GetElement(t, k)->key.letter;
+                    strcpy(GetElement(t, k)->value, GetElement(t, k + i)->value);
+                    GetElement(t, k)->key.number = GetElement(t, k + i)->key.number;
+                    GetElement(t, k)->key.letter = GetElement(t, k + i)->key.letter;
+                    strcpy(GetElement(t, k + i)->value, tmpVal);
+                    GetElement(t, k + i)->key.number = tmpNum;
+                    GetElement(t, k + i)->key.letter = tmpLet;
+                }
             }
-            strcpy(GetElement(t, j)->key, temp2);
-            strcpy(GetElement(t, j)->value, temp3);
         }
     }
 }
 
-char* Search(Table* t, char* key) {
+char* Search(Table* t, int num, char let) {
     int n = t->size;
     int low, high, middle;
     low = 0;
     high = n - 1;
+    char key[2];
+    char tempKey[2];
+    key[0] = (char)num;
+    key[1] = let;
     while (low <= high)
     {
         middle = (low + high) / 2;
-        if (strcmp(key, GetElement(t, middle)->key) < 0)
+        tempKey[0] = (char)GetElement(t, middle)->key.number;
+        tempKey[1] = GetElement(t, middle)->key.letter;
+        if ((num < GetElement(t, middle)->key.number) || ((num == GetElement(t, middle)->key.number) && (let < GetElement(t, middle)->key.letter)))
             high = middle - 1;
-        else if (strcmp(key, GetElement(t, middle)->key) > 0)
+        else if (num > GetElement(t, middle)->key.number)
             low = middle + 1;
-        else
+        else if ((num == GetElement(t, middle)->key.number) && (let > GetElement(t, middle)->key.letter)) {
+            low = middle + 1;
+        }
+        else if ((num == GetElement(t, middle)->key.number) && (let == GetElement(t, middle)->key.letter))
             return GetElement(t, middle)->value;
     }
     return "No such element";
@@ -130,11 +142,31 @@ char* Search(Table* t, char* key) {
 
 int main() {
     Table *t = Create();
+    FILE *in = fopen("input.txt", "r");
     int op;
     char op1[] = "";
-    char key1[3];
+    char letter = ' ', letter1;
+    int num, num1;
     char value1[100];
-    printf("1. Add new element\n2. Print the table\n3. Sort\n4. BinSearch\n5. Exit\n");
+    int i = 0;
+    printf("1. Print the table\n2. Sort\n3. BinSearch\n4. Exit\n");
+    while (!feof(in)) {
+        fscanf(in,"%d", &num);
+        fseek(in, 1, SEEK_CUR);
+        fscanf(in ,"%c", &letter);
+        fseek(in, 1, SEEK_CUR);
+        fscanf(in, "%c", &value1[i]);
+        while (value1[i] != '\n' && !feof(in)) {
+            i++;
+            fscanf(in, "%c", &value1[i]);
+        }
+        value1[i] = '\0';
+        i = 0;
+        PushBack(t, num, letter, value1);
+        if (feof(in))
+            break;
+        memset(value1,'\0',100);
+    }
     while (1) {
         printf("Enter option:");
         do {
@@ -143,23 +175,18 @@ int main() {
         } while (op == -1);
         switch (op) {
             case 1:
-                printf("Enter key and value:\n");
-                scanf("%s", key1);
-                scanf("%s", value1);
-                PushBack(t, key1, value1);
-                break;
-            case 2:
                 PrintTable(t);
                 break;
-            case 3:
+            case 2:
                 ShellSort(t);
                 break;
-            case 4:
+            case 3:
                 printf("Enter key of searching element: ");
-                scanf("%s", key1);
-                printf("%s\n", Search(t, key1));
+                scanf("%d", &num1);
+                scanf("%s", &letter1);
+                printf("%s\n", Search(t, num1, letter1));
                 break;
-            case 5:
+            case 4:
                 return 0;
             default:
                 printf("No such option");
